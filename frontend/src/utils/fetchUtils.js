@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_BASE_URL } from '../config';
 
 // Helper function to fetch data with error handling and authentication
 export const fetchWithAuth = async (url, options = {}) => {
