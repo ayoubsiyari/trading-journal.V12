@@ -1,0 +1,19 @@
+[build]
+  command = "cd frontend && npm install && npm run build"
+  publish = "frontend/build"
+
+[build.environment]
+  NODE_VERSION = "18.0.0"
+  NPM_VERSION = "9.0.0"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[dev]
+  framework = "#custom"
+  command = "cd frontend && npm start"
+  port = 3000
+  targetPort = 3000
+  publish = "frontend/build"

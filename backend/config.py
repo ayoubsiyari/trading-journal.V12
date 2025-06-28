@@ -1,7 +1,7 @@
-import secrets
+import os
 
 class Config:
-    SQLALCHEMY_DATABASE_URI = "sqlite:///journal.db"
-  # ✅ SQLite file DB
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'secretkey')
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///journal.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    JWT_SECRET_KEY = 'supersecret'  # or your chosen key
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwtsecret')

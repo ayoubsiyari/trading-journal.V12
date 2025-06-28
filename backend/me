@@ -1,0 +1,21 @@
+from app import app
+from models import db, User
+from werkzeug.security import generate_password_hash
+
+with app.app_context():
+     
+    admin = User.query.filter_by(email="admin@mydomain.com").first()
+    print("Before:", admin.id, admin.email, admin.is_admin)
+     # 2) Change whatever fields you need. For example, to set a new password:
+    admin.password = generate_password_hash("taylorAB@1994")
+
+     # 3) Maybe you also want to change the email:
+    admin.email = "siyariayoub@gmail.com"
+
+     # 4) Or toggle is_admin (True/False):
+    admin.is_admin = True
+
+     # 5) Commit your changes
+    db.session.commit()
+    print("After: ", admin.id, admin.email, admin.is_admin)
+    

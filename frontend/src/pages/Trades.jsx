@@ -1,6 +1,7 @@
 // frontend/src/pages/Trades.jsx
 
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // Utility formatters
 const formatCurrency = (val) => `$${parseFloat(val || 0).toFixed(2)}`;
@@ -49,11 +50,12 @@ const StatusBadge = ({ status, pnl }) => {
 };
 
 export default function Trades() {
+  const navigate = useNavigate();
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState('created_at');
+  const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('desc');
   const [filterDirection, setFilterDirection] = useState('all');
 
@@ -132,7 +134,7 @@ export default function Trades() {
       let aVal = a[sortField];
       let bVal = b[sortField];
       
-      if (sortField === 'created_at') {
+      if (sortField === 'date') {
         aVal = new Date(aVal);
         bVal = new Date(bVal);
       } else if (['entry_price', 'exit_price', 'pnl', 'rr'].includes(sortField)) {
@@ -317,11 +319,11 @@ export default function Trades() {
                     <tr>
                       <th 
                         className="text-left py-4 px-6 font-bold text-gray-700 text-sm uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-200"
-                        onClick={() => handleSort('created_at')}
+                        onClick={() => handleSort('date')}
                       >
                         <div className="flex items-center space-x-1">
                           <span>Date</span>
-                          {sortField === 'created_at' && (
+                          {sortField === 'date' && (
                             <span className="text-blue-600">
                               {sortDirection === 'asc' ? '↑' : '↓'}
                             </span>
@@ -380,7 +382,7 @@ export default function Trades() {
                     {filteredTrades.map((trade, idx) => (
                       <tr key={trade.id} className="hover:bg-blue-50/50 transition-colors duration-200">
                         <td className="py-4 px-6 text-gray-700 font-medium">
-                          {formatDate(trade.created_at)}
+                          {formatDate(trade.date)}
                         </td>
                         <td className="py-4 px-6 font-bold text-gray-900">
                           {trade.symbol}
@@ -391,7 +393,7 @@ export default function Trades() {
                               ? 'bg-green-100 text-green-700 border border-green-200' 
                               : 'bg-red-100 text-red-700 border border-red-200'
                           }`}>
-                            {trade.direction === 'long' ? '📈 LONG' : '📉 SHORT'}
+                            {trade.direction === 'long' ? 'LONG' : 'SHORT'}
                           </span>
                         </td>
                         <td className="py-4 px-6 font-semibold text-gray-700">
@@ -416,10 +418,17 @@ export default function Trades() {
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex items-center space-x-2">
-                            <ActionButton type="view" onClick={() => console.log('View trade', trade.id)}>
-                              👁️ View
+                            
+                            <ActionButton 
+                              type="view" 
+                              onClick={() => navigate(`/analytics/exit-analysis/${trade.id}`)}
+                            >
+                              📊 Analyze
                             </ActionButton>
-                            <ActionButton type="edit" onClick={() => console.log('Edit trade', trade.id)}>
+                            <ActionButton 
+                              type="edit" 
+                              onClick={() => console.log('Edit trade', trade.id)}
+                            >
                               ✏️ Edit
                             </ActionButton>
                           </div>

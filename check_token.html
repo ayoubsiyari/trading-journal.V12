@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Token</title>
+    <script>
+        window.onload = function() {
+            const token = localStorage.getItem('token');
+            const output = document.getElementById('output');
+            if (token) {
+                output.textContent = 'Token found: ' + token.substring(0, 20) + '...';
+                
+                // Test the token by making an API request
+                fetch('http://localhost:5000/api/journal/list', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`HTTP ${response.status}: ${text}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    output.textContent += '\n\nAPI Response: ' + JSON.stringify({
+                        status: 'success',
+                        tradeCount: data.length,
+                        firstTrade: data.length > 0 ? data[0] : 'No trades found'
+                    }, null, 2);
+                })
+                .catch(error => {
+                    output.textContent += '\n\nAPI Error: ' + error.message;
+                });
+            } else {
+                output.textContent = 'No token found in localStorage';
+            }
+        };
+    </script>
+</head>
+<body>
+    <h1>Token Checker</h1>
+    <div id="output" style="white-space: pre-wrap; font-family: monospace;">Checking token...</div>
+</body>
+</html>

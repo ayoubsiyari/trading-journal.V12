@@ -1,0 +1,85 @@
+
+Modern Minimalist Design System
+This design emphasizes a clean, professional, and highly readable user experience, suitable for data-intensive applications like trading dashboards. It combines a sophisticated aesthetic with clear functional elements.
+1. Color Palette & Background:
+Primary Background: A subtle gradient from a light indigo/blue to a light cyan/white (e.g., from-indigo-50 via-white to-cyan-50 in Tailwind CSS) for a fresh, airy feel in light mode. For dark mode, a gradient from dark gray to slightly lighter dark gray (from-gray-900 via-gray-800 to-gray-900) provides a deep, professional backdrop.
+Accent Colors: Vibrant but not overwhelming colors are used for key data points and interactive elements. Emerald green (emerald-500/600) for positive values, red (red-500/600) for negative, and shades of indigo (indigo-500/600) and cyan (cyan-500/600) for highlights, branding, and interactive components.
+Neutral Tones: A range of grays (gray-100 to gray-900) are used for text, borders, and subtle backgrounds to ensure readability and provide visual separation.
+2. Layout & Structure:
+Clean Grid System: Content is organized using a responsive grid layout (e.g., grid grid-cols-1 lg:grid-cols-X) to ensure elements are well-aligned and spaced, adapting smoothly across different screen sizes.
+Defined Sections: Clear visual separation between different content blocks (e.g., header, KPIs, charts, tables) using consistent padding (p-6, py-8, px-6) and margins (mb-8).
+Hero Elements: Key information (like Total P&L) is given prominence in larger, more visually impactful cards to draw immediate attention.
+Sticky Header (Optional): A fixed header with a subtle backdrop blur (backdrop-blur-xl) and slight transparency (bg-white/80 or bg-gray-900/80) can be used for persistent navigation and controls.
+3. Component Styling (Cards & Containers):
+Subtle Depth: Cards and containers feature soft shadows (shadow-sm, shadow-md) and thin, light borders (border border-gray-200 dark:border-gray-700) to create a sense of depth without being heavy.
+Rounded Corners: Generous use of rounded-xl or rounded-2xl for a modern, friendly aesthetic.
+Hover Effects: Subtle transition-colors and hover:bg-opacity or hover:shadow-lg for interactive elements to provide visual feedback.
+4. Typography:
+Clean Sans-Serif Fonts: Prioritize readability with modern sans-serif fonts. Use varying font weights (font-bold, font-semibold, font-medium) and sizes (text-sm, text-lg, text-2xl, text-5xl) to establish a clear visual hierarchy.
+Uppercase Labels: Use uppercase and tracking-wider for section titles and metric labels to add a professional touch.
+5. Data Visualization (Charts & Tables):
+Minimalist Charts: Charts (Area, Bar, Pie) use clean lines, subtle grid patterns (stroke-dasharray), and the established accent colors for data representation. Avoid overly complex chart elements.
+Clear Tooltips: Tooltips are styled cleanly with a solid background, border, and clear text for easy data interpretation on hover.
+Readable Tables: Tables have clear headers, subtle row dividers, and consistent padding. Text colors are chosen for optimal readability against the background.
+6. Interactive Elements (Buttons, Selects):
+Consistent Styling: Buttons and select inputs maintain a consistent look with rounded corners, appropriate padding, and clear hover/focus states.
+Gradient Buttons: Key action buttons (e.g.,
+==================================================================================================================
+
+**Design System Prompt: Modern Minimalist & Professional Analytics**
+
+**Objective:** Apply a clean, professional, and highly readable aesthetic to all pages, maintaining consistency with the Dashboard.jsx component.
+
+**Core Principles:**
+1.  **Cleanliness & Readability:** Prioritize clear information hierarchy and easy readability.
+2.  **Subtle Depth:** Use soft shadows and thin borders for a modern, layered look.
+3.  **Responsiveness:** Ensure seamless adaptation across all device sizes.
+4.  **Functional Aesthetics:** Design elements should enhance, not distract from, data and functionality.
+
+**Key Elements to Implement:**
+
+**A. Color & Background:**
+    *   **Light Mode Background:** Subtle gradient from light indigo/blue to light cyan/white (e.g., `bg-gradient-to-br from-indigo-50 via-white to-cyan-50`).
+    *   **Dark Mode Background:** Deep gray gradient (e.g., `bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900`).
+    *   **Accent Colors:** Emerald for positive, Red for negative. Indigo and Cyan for branding/highlights.
+    *   **Neutrals:** Extensive use of gray scale for text, borders, and subtle backgrounds.
+
+**B. Layout & Structure:**
+    *   **Grid-Based Layout:** Utilize responsive CSS Grid (e.g., `grid grid-cols-X`) for organized content alignment.
+    *   **Consistent Spacing:** Apply uniform padding and margins (e.g., `p-6`, `mb-8`) across all components and sections.
+    *   **Prominent Hero Sections:** Highlight key information with larger, visually impactful cards or sections.
+    *   **Clear Sectioning:** Use distinct containers and subtle borders to separate content blocks.
+
+**C. Component Styling (Cards, Containers, Buttons):**
+    *   **Rounded Corners:** Apply `rounded-xl` or `rounded-2xl` for a modern, soft appearance.
+    *   **Subtle Shadows:** Use `shadow-sm` or `shadow-md` for depth without heaviness.
+    *   **Glassmorphism (Optional, for premium feel):** Apply `backdrop-blur-xl` and `bg-opacity` for translucent elements (e.g., header, specific cards).
+    *   **Interactive Feedback:** Implement `transition-colors` and `hover:bg-opacity` or `hover:shadow-lg` for all interactive elements.
+    *   **Buttons:** Use subtle gradients (e.g., `bg-gradient-to-r from-indigo-600 to-cyan-600`) for primary actions; clean, border-based styles for secondary actions.
+
+**D. Typography:**
+    *   **Sans-Serif Fonts:** Prioritize clean, readable sans-serif typefaces.
+    *   **Hierarchical Sizing:** Use varying font sizes and weights (`font-bold`, `font-semibold`, `font-medium`) to establish clear visual hierarchy.
+    *   **Uppercase Labels:** Apply `uppercase` and `tracking-wider` for section titles and metric labels.
+
+**E. Data Visualization (Charts, Tables):**
+    *   **Minimalist Charts:** Clean lines, subtle grid patterns, and consistent accent colors for data representation.
+    *   **Clear Tooltips:** Clean, solid background tooltips with clear text.
+    *   **Readable Tables:** Defined headers, subtle row dividers, and clear text colors.
+
+**F. Interactive Elements (Inputs, Selects):**
+    *   **Consistent Styling:** Uniform appearance with rounded corners, appropriate padding, and clear hover/focus states.
+
+**Goal:** Ensure every page reflects this modern, minimalist, and professional aesthetic, providing a cohesive and intuitive user experience across your entire application.
+Manus has completed the current task
+How well did Manus complete this task?
+Rate and get 100 credits
+// src/pages/Dashboard.jsx
+
+import React, { useEffect, useState } from 'react';
+import AISummary from '../components/AISummary';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+

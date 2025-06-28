@@ -1,11 +1,17 @@
+# app.py
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from models import db
 from config import Config
+
+# 1️⃣ Import the Blueprint objects by name:
 from routes.auth_routes import auth_bp
 from routes.journal_routes import journal_bp
-from routes.profile_routes import profile_bp  # <-- new
+from routes.profile_routes import profile_bp
+from routes.admin_routes import admin_bp  # <-- your new admin routes
+
 import jwt as pyjwt
 
 app = Flask(__name__)
@@ -22,9 +28,10 @@ db.init_app(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # Register routes
-app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(auth_bp,    url_prefix='/api/auth')
 app.register_blueprint(journal_bp, url_prefix='/api/journal')
 app.register_blueprint(profile_bp, url_prefix='/api/auth/profile')
+app.register_blueprint(admin_bp,   url_prefix='/api/admin')   # ← register admin
 
 @app.route('/')
 def home():
@@ -46,7 +53,7 @@ def debug_verify_token():
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
         return jsonify({"error": "No token provided"}), 400
-    
+
     token = auth_header.split(' ')[1]
     secret = app.config.get('JWT_SECRET_KEY')
 
@@ -73,3 +80,4 @@ if __name__ == '__main__':
         db.create_all()
         print("✅ Tables created:", db.metadata.tables.keys())
     app.run(debug=True)
+

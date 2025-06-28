@@ -1,0 +1,11 @@
+symbol,direction,entry_price,exit_price,quantity,pnl,rr,date,time,notes,var1,var2,var3,var4,var5,var6,var7,var8,var9,var10
+EUR/USD,BUY,1.1200,1.1250,1000,50.00,2.5,2023-01-01,10:00:00,Good trade,Morning,London,15min,Breakout,Strong,High,News,Yes,No,Maybe
+GBP/USD,SELL,1.3100,1.3050,500,25.00,1.8,2023-01-02,14:30:00,Quick scalp,Afternoon,New York,1h,Retest,Medium,Medium,No News,No,Yes,Yes
+USD/JPY,BUY,110.50,111.00,800,40.00,3.0,2023-01-03,09:15:00,Strong trend,Morning,Tokyo,4h,Trend,Strong,High,News,Yes,Yes,No
+AUD/USD,SELL,0.7500,0.7450,1200,60.00,2.2,2023-01-04,16:45:00,End of day,Evening,Sydney,15min,Reversal,Weak,Low,No News,No,No,Yes
+USD/CAD,BUY,1.2500,1.2550,600,30.00,1.5,2023-01-05,11:30:00,Range trade,Morning,London,1h,Range,Medium,Medium,News,Yes,No,Maybe
+EUR/GBP,SELL,0.8500,0.8480,900,18.00,1.2,2023-01-06,13:20:00,Small win,Afternoon,London,4h,Breakout,Weak,Low,No News,No,Yes,No
+USD/CHF,BUY,0.9200,0.9250,700,35.00,2.8,2023-01-07,08:45:00,Early trade,Morning,Tokyo,1h,Trend,Strong,High,News,Yes,Yes,Yes
+NZD/USD,SELL,0.7000,0.6950,1000,50.00,2.0,2023-01-08,15:30:00,Afternoon move,Afternoon,New York,15min,Retest,Medium,Medium,No News,No,No,Maybe
+EUR/JPY,BUY,130.00,130.60,500,30.00,2.4,2023-01-09,10:15:00,Strong move,Morning,London,4h,Breakout,Strong,High,News,Yes,Yes,Yes
+GBP/JPY,SELL,150.00,149.50,800,40.00,1.8,2023-01-10,12:45:00,Lunchtime trade,Afternoon,London,1h,Reversal,Weak,Low,No News,No,No,No

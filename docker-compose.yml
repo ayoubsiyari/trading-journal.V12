@@ -1,0 +1,12 @@
+version: '3.9'
+services:
+  app:
+    build: .
+    container_name: trading-journal-app
+    ports:
+      - "5000:5000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+      - FLASK_ENV=production
+    restart: unless-stopped

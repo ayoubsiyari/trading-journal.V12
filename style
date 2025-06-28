@@ -1,0 +1,254 @@
+# Professional Trading Platform Design System
+*Reference prompt for consistent UI/UX across all pages*
+
+## 🎨 **Core Design Philosophy**
+Create a sophisticated, professional trading platform interface inspired by EdgeWounk and FXrplay with these principles:
+- **Dark-first design** for reduced eye strain during extended trading sessions
+- **Glass-morphism** with subtle transparency and backdrop blur effects
+- **Gradient accents** for visual hierarchy without distraction
+- **Micro-interactions** that feel premium and responsive
+- **Data-driven layout** that prioritizes information clarity
+
+## 🌈 **Color Palette**
+
+### Background Colors
+```css
+Primary Background: bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900
+Secondary Background: bg-slate-800/30
+Card Background: bg-slate-800/30 or bg-[color]-500/10
+Header Background: bg-slate-900/50
+```
+
+### Accent Colors
+```css
+Blue Gradient: from-blue-500 to-cyan-400
+Green Gradient: from-green-500 to-emerald-400
+Red Gradient: from-red-500 to-rose-400
+Purple Gradient: from-purple-500 to-violet-400
+Orange Gradient: from-orange-500 to-amber-400
+Teal Gradient: from-teal-500 to-cyan-400
+Indigo Gradient: from-indigo-500 to-blue-400
+```
+
+### Text Colors
+```css
+Primary Text: text-white
+Secondary Text: text-slate-300
+Muted Text: text-slate-400
+Success Text: text-green-400
+Danger Text: text-red-400
+Info Text: text-blue-400
+```
+
+## 🏗️ **Layout Structure**
+
+### Page Container
+```jsx
+<div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+  {/* Header */}
+  {/* Main Content */}
+</div>
+```
+
+### Header Pattern
+```jsx
+<div className="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-sm">
+  <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="flex items-center space-x-4">
+      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+        <IconComponent className="w-5 h-5 text-white" />
+      </div>
+      <div>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+          Page Title
+        </h1>
+        <p className="text-slate-400 mt-1">Page description</p>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+### Content Container
+```jsx
+<div className="max-w-7xl mx-auto px-6 py-10">
+  {/* Page content */}
+</div>
+```
+
+## 📱 **Component Patterns**
+
+### Metric Cards
+```jsx
+<div className="relative group bg-[color]-500/10 border-[color]-500/20 border backdrop-blur-sm rounded-2xl p-6 hover:scale-105 transition-all duration-300 hover:shadow-2xl">
+  {/* Gradient overlay */}
+  <div className="absolute inset-0 bg-gradient-to-r from-[color]-500 to-[color]-400 opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity duration-300"></div>
+  
+  {/* Content */}
+  <div className="relative z-10">
+    <div className="flex items-center justify-between mb-4">
+      <div className="p-3 rounded-xl bg-[color]-500/10 border-[color]-500/20 border">
+        <IconComponent className="w-6 h-6 text-[color]-400" />
+      </div>
+    </div>
+    <p className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-2">
+      Metric Label
+    </p>
+    <p className="text-2xl font-bold text-[color]-400 group-hover:scale-105 transition-transform duration-200">
+      Metric Value
+    </p>
+  </div>
+
+  {/* Decorative elements */}
+  <div className="absolute top-4 right-4 w-20 h-20 bg-gradient-to-r from-slate-700/20 to-transparent rounded-full blur-xl opacity-50"></div>
+</div>
+```
+
+### Data Tables
+```jsx
+<div className="bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm rounded-2xl overflow-hidden">
+  <div className="px-6 py-4 border-b border-slate-700/50">
+    <h3 className="text-lg font-semibold text-white">Table Title</h3>
+  </div>
+  <div className="overflow-x-auto">
+    <table className="w-full">
+      <thead className="bg-slate-700/30">
+        <tr>
+          <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+            Column Header
+          </th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-700/50">
+        <tr className="hover:bg-slate-700/20 transition-colors duration-150">
+          <td className="px-6 py-4 text-sm text-slate-300">Cell Content</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+```
+
+### Form Elements
+```jsx
+<div className="space-y-4">
+  <div>
+    <label className="block text-sm font-medium text-slate-300 mb-2">
+      Field Label
+    </label>
+    <input 
+      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+      placeholder="Enter value..."
+    />
+  </div>
+</div>
+```
+
+### Buttons
+```jsx
+{/* Primary Button */}
+<button className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl">
+  Primary Action
+</button>
+
+{/* Secondary Button */}
+<button className="px-6 py-3 bg-slate-700/50 border border-slate-600/50 text-slate-300 font-semibold rounded-xl hover:bg-slate-600/50 hover:text-white transition-all duration-200">
+  Secondary Action
+</button>
+```
+
+## 🎭 **Loading & Error States**
+
+### Loading State
+```jsx
+<div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+  <div className="text-center">
+    <div className="relative">
+      <div className="w-16 h-16 border-4 border-slate-600 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
+      <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-purple-500 rounded-full animate-spin mx-auto" style={{animationDelay: '0.15s', animationDuration: '0.8s'}}></div>
+    </div>
+    <p className="mt-6 text-slate-300 font-medium">Loading message...</p>
+  </div>
+</div>
+```
+
+### Error State
+```jsx
+<div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 backdrop-blur-sm">
+  <p className="text-red-400 font-semibold text-center">{error}</p>
+</div>
+```
+
+### Empty State
+```jsx
+<div className="text-center py-20 text-slate-400">
+  <IconComponent className="w-16 h-16 mx-auto mb-4 opacity-50" />
+  <p className="text-lg">No data available</p>
+  <p className="text-sm mt-2">Try adjusting your filters or check back later</p>
+</div>
+```
+
+## ⚡ **Animations & Interactions**
+
+### Hover Effects
+- `hover:scale-105` for cards and buttons
+- `hover:shadow-2xl` for elevated elements
+- `transition-all duration-300` for smooth animations
+- `group-hover:opacity-5` for gradient overlays
+
+### Staggered Animations
+```jsx
+style={{animationDelay: `${index * 100}ms`}}
+```
+
+### Micro-interactions
+- Scale transforms on important values
+- Color transitions on state changes
+- Subtle blur effects for depth
+
+## 🎯 **Typography Scale**
+
+```css
+Page Title: text-3xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent
+Section Header: text-xl font-semibold text-white
+Card Title: text-lg font-semibold text-white
+Metric Value: text-2xl font-bold text-[color]-400
+Metric Label: text-xs font-medium text-slate-400 uppercase tracking-wider
+Body Text: text-sm text-slate-300
+Muted Text: text-xs text-slate-400
+```
+
+## 📐 **Spacing & Sizing**
+
+```css
+Page Padding: px-6 py-10
+Card Padding: p-6
+Header Padding: px-6 py-8
+Icon Sizes: w-5 h-5 (small), w-6 h-6 (medium), w-8 h-8 (large)
+Rounded Corners: rounded-xl (standard), rounded-2xl (cards)
+Grid Gaps: gap-6
+```
+
+## 🔧 **Implementation Notes**
+
+1. **Always use backdrop-blur-sm** for glass-morphism effects
+2. **Implement hover states** for all interactive elements
+3. **Use gradient text** for important headings
+4. **Add decorative blur elements** for visual depth
+5. **Maintain consistent border opacity** (border-slate-700/50)
+6. **Use proper loading states** with dual spinners
+7. **Implement proper error handling** with styled error states
+8. **Add staggered animations** for lists and grids
+
+## 📱 **Responsive Design**
+
+```css
+Mobile: Default (single column)
+Tablet: sm:grid-cols-2
+Desktop: lg:grid-cols-3 or lg:grid-cols-4
+Large Desktop: max-w-7xl mx-auto
+```
+
+---
+
+*Use this design system consistently across all pages to maintain a cohesive, professional trading platform experience.*

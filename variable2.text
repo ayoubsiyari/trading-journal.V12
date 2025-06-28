@@ -1,0 +1,1897 @@
+import React, { useEffect, useState, useMemo } from 'react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  ZAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+  Legend,
+  PieChart,
+  Pie,
+  LineChart,
+  Line,
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ScatterChart,
+  Scatter,
+  ComposedChart,
+  Area,
+  AreaChart,
+  ReferenceLine,
+  Label,
+} from 'recharts';
+import { Settings, ChevronUp, ChevronDown, Info, TrendingUp, TrendingDown, Target, Award, BarChart3, X, Filter } from 'lucide-react';
+
+// ─── Format helpers ─────────────────────────────────────────────────────────────
+const formatCurrency = (val) =>
+  val == null ? 'N/A' : `$${parseFloat(val).toFixed(2)}`;
+const formatPercent = (val) =>
+  val == null ? 'N/A' : `${parseFloat(val).toFixed(1)}%`;
+const formatRiskReward = (val) =>
+  val == null ? 'N/A' : `${parseFloat(val).toFixed(2)}:1`;
+
+const COLORS = [
+  "#0088FE", "#00C49F", "#FFBB28", "#FF8042",
+  "#A28EFF", "#FF6D91", "#82ca9d", "#8884d8",
+  "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4",
+  "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F"
+];
+
+function VariablePie({ title, data }) {
+  if (!data || data.length === 0) return null;
+  return (
+    <div className="bg-white rounded-xl p-6 shadow border border-gray-200">
+      <h2 className="text-xl font-bold mb-4">{title}</h2>
+      <ResponsiveContainer width="100%" height={250}>
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            innerRadius={50}
+            outerRadius={100}
+            paddingAngle={5}
+          >
+            {data.map((_, index) => (
+              <Cell key={index} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export default function VariablesAnalysis() {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [sortBy, setSortBy] = useState('pnl');
+  const [sortDirection, setSortDirection] = useState('desc');
+  const [variableFilter, setVariableFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [showCols, setShowCols] = useState({ 
+    trades: true, 
+    win_rate: true, 
+    avg_rr: true 
+  });
+  const [activeTab, setActiveTab] = useState('table');
+  const [selectedTimeframe, setSelectedTimeframe] = useState('all');
+  const [apiResponse, setApiResponse] = useState(null); // Store full API response for debugging
+  const [combinationFilters, setCombinationFilters] = useState({});
+  const [availableVariables, setAvailableVariables] = useState({});
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeCombination, setActiveCombination] = useState(null); // Track active radar chart combination
+
+  // ─── Combination analysis state ─────────────────────────────────────────────
+  const [combinationsData, setCombinationsData] = useState([]);
+  const [combinationsLoading, setCombinationsLoading] = useState(false);
+  const [combinationLevel, setCombinationLevel] = useState(2);
+  const [minTrades, setMinTrades] = useState(3);
+  const [combinationStats, setCombinationStats] = useState(null);
+
+  // ─── Fetch variables analysis data ──────────────────────────────────────────
+  useEffect(() => {
+    const fetchVariablesData = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+        
+        let url = 'http://localhost:5000/api/journal/variables-analysis';
+        
+        // Add filters if provided
+        const params = new URLSearchParams();
+        if (fromDate) params.append('from_date', fromDate);
+        if (toDate) params.append('to_date', toDate);
+        if (selectedTimeframe !== 'all') params.append('timeframe', selectedTimeframe);
+        
+        const queryString = params.toString();
+        if (queryString) url += `?${queryString}`;
+        
+        console.log('Fetching variables data from:', url);
+        
+        const res = await fetch(url, {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'include'
+        });
+        
+        console.log('Response status:', res.status, res.statusText);
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('Error response:', errorText);
+          throw new Error(`API Error: ${res.status} ${res.statusText} - ${errorText}`);
+        }
+        
+        const json = await res.json();
+        console.log('API Response:', json);
+        
+        // Store full response for debugging
+        setApiResponse(json);
+        
+        // Handle the data structure from API
+        if (json && json.variables && Array.isArray(json.variables)) {
+          console.log(`Found ${json.variables.length} variables`);
+          setData(json.variables);
+        } else {
+          console.warn('No variables data found in API response');
+          setData([]);
+        }
+        
+        setError('');
+      } catch (err) {
+        console.error('❌ Error in fetchVariablesData:', {
+          message: err.message,
+          stack: err.stack,
+          name: err.name
+        });
+        setError(`Error: ${err.message}. Please check the console for more details.`);
+        setData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchVariablesData();
+  }, [fromDate, toDate, selectedTimeframe]);
+
+  // ─── Fetch combinations analysis data ───────────────────────────────────────
+  useEffect(() => {
+    const fetchCombinationsData = async () => {
+      if (activeTab !== 'combinations') return;
+      
+      try {
+        setCombinationsLoading(true);
+        const token = localStorage.getItem('token');
+        let url = 'http://localhost:5000/api/journal/variables-analysis';
+        
+        // Add filters if provided
+        const params = new URLSearchParams();
+        params.append('combine_vars', 'true');
+        params.append('combination_level', combinationLevel.toString());
+        params.append('min_trades', minTrades.toString());
+        if (fromDate) params.append('from_date', fromDate);
+        if (toDate) params.append('to_date', toDate);
+        if (selectedTimeframe !== 'all') params.append('timeframe', selectedTimeframe);
+        
+        const queryString = params.toString();
+        if (queryString) url += `?${queryString}`;
+        
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Failed to fetch combinations data: ${res.status} ${errorText}`);
+        }
+        
+        const json = await res.json();
+        console.log('Combinations API Response:', json);
+        
+        if (json && Array.isArray(json.combinations)) {
+          setCombinationsData(json.combinations);
+          setCombinationStats(json.stats_summary);
+        } else {
+          console.warn('No combinations data found in API response');
+          setCombinationsData(json.combinations || []);
+          setCombinationStats(json.stats_summary || null);
+        }
+        
+        setError('');
+      } catch (err) {
+        console.error('❌ Error loading combinations data:', err);
+        setError(err.message || 'Error loading combinations data');
+        setCombinationsData([]);
+        setCombinationStats(null);
+      } finally {
+        setCombinationsLoading(false);
+      }
+    };
+    
+    fetchCombinationsData();
+  }, [activeTab, combinationLevel, minTrades, fromDate, toDate, selectedTimeframe]);
+  useEffect(() => {
+    if (!combinationsData || combinationsData.length === 0) {
+      setAvailableVariables({});
+      return;
+    }
+  
+    const vars = {};
+  
+    combinationsData.forEach(combo => {
+      const parts = combo.combination.split(' & ');
+      parts.forEach(part => {
+        const [varName, varValue] = part.split(':').map(s => s.trim());
+        if (!vars[varName]) {
+          vars[varName] = new Set();
+        }
+        if (varValue) {
+          vars[varName].add(varValue);
+        }
+      });
+    });
+  
+    // Convert Sets to arrays for rendering
+    const processedVars = {};
+    Object.keys(vars).forEach(key => {
+      processedVars[key] = Array.from(vars[key]);
+    });
+  
+    setAvailableVariables(processedVars);
+  }, [combinationsData]);
+  // ─── Sorting and filtering helpers ─────────────────────────────────────────
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDirection('desc');
+    }
+  };
+  
+  const sortIcon = (column) => {
+    if (sortBy === column) {
+      return sortDirection === 'asc' ? (
+        <ChevronUp className="h-4 w-4" />
+      ) : (
+        <ChevronDown className="h-4 w-4" />
+      );
+    }
+    return null;
+  };
+  
+  // Sort and filter data
+  const sortedAndFilteredData = Array.isArray(data) 
+    ? [...data]
+        .filter(item => 
+          item.variable && item.variable.toLowerCase().includes(variableFilter.toLowerCase())
+        )
+        .sort((a, b) => {
+          const aValue = a[sortBy];
+          const bValue = b[sortBy];
+          
+          if (aValue === bValue) return 0;
+          if (aValue == null) return 1;
+          if (bValue == null) return -1;
+          
+          const direction = sortDirection === 'asc' ? 1 : -1;
+          return aValue > bValue ? direction : -direction;
+        })
+    : [];
+    const filterCombinations = useMemo(() => {
+    if (!combinationsData) return [];
+    if (Object.keys(combinationFilters).length === 0) {
+      return combinationsData;
+    }
+  
+    return combinationsData.filter(combo => {
+      const parts = combo.combination.split(' & ');
+      const comboVars = {};
+      
+      parts.forEach(part => {
+        const [varName, varValue] = part.split(':').map(s => s.trim());
+        if (varName && varValue) {
+          comboVars[varName] = varValue;
+        }
+      });
+  
+      return Object.entries(combinationFilters).every(([varName, values]) => {
+        if (!values || values.length === 0) return true;
+        return values.some(value => comboVars[varName] === value);
+      });
+    });
+  }, [combinationsData, combinationFilters]);
+  
+  // Count active filters
+  const activeFilterCount = useMemo(() => {
+    return Object.values(combinationFilters).reduce(
+      (count, values) => count + (values ? values.length : 0),
+      0
+    );
+  }, [combinationFilters]);
+  
+  // FilterSidebar component
+  const FilterSidebar = () => (
+    <div className={`fixed inset-y-0 right-0 w-80 bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-50 overflow-y-auto ${
+      showFilters ? 'translate-x-0' : 'translate-x-full'
+    }`}>
+      <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+        <h3 className="text-lg font-medium">Filter Combinations</h3>
+        <button 
+          onClick={() => setShowFilters(false)}
+          className="text-gray-400 hover:text-gray-700"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+      
+      <div className="p-4 space-y-6">
+        {Object.entries(availableVariables).map(([varName, values]) => (
+          <div key={varName} className="space-y-2">
+            <h4 className="text-sm font-medium text-gray-700">{varName}</h4>
+            <div className="space-y-2 max-h-48 overflow-y-auto p-1">
+              {values.map(value => (
+                <label key={value} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={combinationFilters[varName]?.includes(value) || false}
+                    onChange={() => {
+                      setCombinationFilters(prev => {
+                        const currentValues = prev[varName] || [];
+                        const newValues = currentValues.includes(value)
+                          ? currentValues.filter(v => v !== value)
+                          : [...currentValues, value];
+                        
+                        return {
+                          ...prev,
+                          [varName]: newValues.length ? newValues : undefined
+                        };
+                      });
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                  />
+                  <span className="text-sm text-gray-700">{value}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gray-50 border-t border-gray-200">
+        <div className="flex justify-between space-x-3">
+          <button
+            onClick={() => setCombinationFilters({})}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
+            disabled={activeFilterCount === 0}
+          >
+            Reset All
+          </button>
+          <button
+            onClick={() => setShowFilters(false)}
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Apply Filters
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+  
+  // Helper to render filter pills
+  const renderActiveFilters = () => {
+    const filters = [];
+    
+    Object.entries(combinationFilters).forEach(([varName, values]) => {
+      if (!values || !values.length) return;
+      
+      values.forEach(value => {
+        filters.push({
+          varName,
+          value,
+          key: `${varName}:${value}`
+        });
+      });
+    });
+    
+    if (filters.length === 0) return null;
+    
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        {filters.map(filter => (
+          <span 
+            key={filter.key}
+            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+          >
+            {filter.varName}: {filter.value}
+            <button
+              onClick={() => {
+                setCombinationFilters(prev => {
+                  const currentValues = prev[filter.varName] || [];
+                  const newValues = currentValues.filter(v => v !== filter.value);
+                  
+                  return {
+                    ...prev,
+                    [filter.varName]: newValues.length ? newValues : undefined
+                  };
+                });
+              }}
+              className="ml-1.5 inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-200 hover:bg-blue-300 text-blue-600 hover:text-blue-900 focus:outline-none"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        ))}
+      </div>
+    );
+  };
+  // FIXED: Use correct property names from API response
+  const summaryStats = apiResponse?.stats_summary || {
+    total_trades: data.reduce((sum, item) => sum + (item.trades || 0), 0),
+    total_pnl: data.reduce((sum, item) => sum + (item.pnl || 0), 0),
+    avg_win_rate: data.length > 0 
+      ? data.reduce((sum, item) => sum + (item.win_rate || 0), 0) / data.length 
+      : 0,
+    avg_profit_factor: data.length > 0 
+      ? data.reduce((sum, item) => sum + (item.profit_factor || 0), 0) / data.length 
+      : 0
+  };
+  
+  // Chart data preparation
+  const chartData = sortedAndFilteredData
+    .slice(0, 10) // Limit to top 10 for better visualization
+    .map(item => ({
+      name: item.variable ? item.variable.split(':').pop().trim() : 'Unknown',
+      pnl: item.pnl || 0,
+      winRate: item.win_rate || 0,
+      trades: item.trades || 0,
+      avgRR: item.avg_rr || 0,
+    }));
+
+  // Add filter overlay when sidebar is open
+  if (showFilters) {
+    return (
+      <div className="fixed inset-0 z-40">
+        <div 
+          className="absolute inset-0 bg-black bg-opacity-50"
+          onClick={() => setShowFilters(false)}
+        />
+        <FilterSidebar />
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 max-w-7xl mx-auto">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">
+                {error}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if no data available
+  if (!data || data.length === 0) {
+    return (
+      <div className="p-8 max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              📊 Variables Analysis
+            </h1>
+            <p className="text-gray-600">Analyze performance by trading variables and patterns</p>
+          </div>
+        </div>
+        
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <Info className="h-5 w-5 text-yellow-400" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">No Variables Data Found</h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p>No trading variables found in your imported data. To see analysis results:</p>
+                <ul className="list-disc list-inside mt-2">
+                  <li>Import trades with variable columns mapped (Setup, Strategy, etc.)</li>
+                  <li>Make sure your CSV contains variable data in the mapped columns</li>
+                  <li>Check that trades were imported successfully</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Debug information */}
+        {apiResponse && (
+          <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Debug Information:</h4>
+            <pre className="text-xs text-gray-600 overflow-auto">
+              {JSON.stringify(apiResponse, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            📊 Variables Analysis
+          </h1>
+          <p className="text-gray-600">Analyze performance by trading variables and patterns</p>
+        </div>
+        <div className="flex space-x-4">
+          <div className="flex space-x-2">
+            <div className="relative">
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                placeholder="From"
+              />
+            </div>
+            <div className="relative">
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                placeholder="To"
+              />
+            </div>
+          </div>
+          <div className="relative">
+            <select
+              value={selectedTimeframe}
+              onChange={(e) => setSelectedTimeframe(e.target.value)}
+              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+            >
+              <option value="all">All Time</option>
+              <option value="30">Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+              <option value="365">Last Year</option>
+            </select>
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Filter variables..."
+              value={variableFilter}
+              onChange={(e) => setVariableFilter(e.target.value)}
+              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Summary Stats */}
+      
+      {/* Tabs */}
+      <div className="mb-6 border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('table')}
+            className={`${activeTab === 'table' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Data Table
+          </button>
+          <button
+            onClick={() => setActiveTab('charts')}
+            className={`${activeTab === 'charts' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Charts
+          </button>
+          <button
+            onClick={() => setActiveTab('combinations')}
+            className={`${activeTab === 'combinations' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            <div className="flex items-center space-x-1">
+              <Target className="h-4 w-4" />
+              <span>Combinations</span>
+            </div>
+          </button>
+        </nav>
+      </div>
+
+      {activeTab === 'table' ? (
+        /* Data Table */
+        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('variable')}
+                  >
+                    <div className="flex items-center">
+                      Variable
+                      {sortIcon('variable')}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('trades')}
+                  >
+                    <div className="flex items-center">
+                      Trades
+                      {sortIcon('trades')}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('win_rate')}
+                  >
+                    <div className="flex items-center">
+                      Win Rate
+                      {sortIcon('win_rate')}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('avg_rr')}
+                  >
+                    <div className="flex items-center">
+                      Avg. R:R
+                      {sortIcon('avg_rr')}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('pnl')}
+                  >
+                    <div className="flex items-center">
+                      P&L
+                      {sortIcon('pnl')}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('profit_factor')}
+                  >
+                    <div className="flex items-center">
+                      Profit Factor
+                      {sortIcon('profit_factor')}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('max_drawdown')}
+                  >
+                    <div className="flex items-center">
+                      Max Drawdown
+                      {sortIcon('max_drawdown')}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('expectancy')}
+                  >
+                    <div className="flex items-center">
+                      Expectancy
+                      {sortIcon('expectancy')}
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {sortedAndFilteredData.map((item, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {item.variable || 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.trades || 0}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatPercent(item.win_rate)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatRiskReward(item.avg_rr)}
+                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${(item.pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(item.pnl)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.profit_factor ? item.profit_factor.toFixed(2) : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatCurrency(item.max_drawdown)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatCurrency(item.expectancy)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : activeTab === 'charts' ? (
+        /* Charts */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Top Variables by P&L</h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={chartData}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={100} />
+                  <Tooltip 
+                    formatter={(value, name) => [
+                      name === 'pnl' ? formatCurrency(value) : value,
+                      name === 'pnl' ? 'P&L' : name
+                    ]}
+                  />
+                  <Bar dataKey="pnl" fill="#8884d8" name="P&L" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Win Rate vs Risk/Reward</h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart
+                  margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                >
+                  <CartesianGrid />
+                  <XAxis 
+                    type="number" 
+                    dataKey="avgRR" 
+                    name="Avg. Risk/Reward"
+                    domain={[0, 'dataMax + 0.5']}
+                  />
+                  <YAxis 
+                    type="number" 
+                    dataKey="winRate" 
+                    name="Win Rate %"
+                    domain={[0, 100]}
+                  />
+                  <Tooltip 
+                    formatter={(value, name) => [
+                      name === 'winRate' ? `${value}%` : value,
+                      name === 'winRate' ? 'Win Rate' : 'Avg. R:R'
+                    ]}
+                  />
+                  <Scatter name="Variables" data={chartData} fill="#8884d8" />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'combinations' ? (
+        /* Combinations Analysis */
+        <div className="space-y-6">
+          {/* Combination Controls */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Combination Settings</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Combination Level
+                </label>
+                <select
+                  value={combinationLevel}
+                  onChange={(e) => setCombinationLevel(parseInt(e.target.value))}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                >
+                  <option value={2}>Pairs (2 variables)</option>
+                  <option value={3}>Trios (3 variables)</option>
+                  <option value={4}>Quads (4 variables)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Minimum Trades
+                </label>
+                <select
+                  value={minTrades}
+                  onChange={(e) => setMinTrades(parseInt(e.target.value))}
+                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                >
+                  <option value={1}>1+ trades</option>
+                  <option value={3}>3+ trades</option>
+                  <option value={5}>5+ trades</option>
+                  <option value={10}>10+ trades</option>
+                </select>
+              </div>
+              <div className="flex items-end space-x-3">
+                <div className="relative">
+                  <button
+                    onClick={() => setShowFilters(true)}
+                    className="flex items-center space-x-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-4 rounded-lg text-sm transition-colors duration-200 shadow-sm"
+                  >
+                    <Filter className="h-4 w-4" />
+                    <span>Filter Combinations</span>
+                    {activeFilterCount > 0 && (
+                      <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 py-0.5 text-xs font-semibold bg-blue-600 text-white rounded-full">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </button>
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-semibold text-white shadow-sm">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    const event = new Event('refresh-combinations');
+                    window.dispatchEvent(event);
+                  }}
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition-colors duration-200 shadow-sm hover:shadow-md"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Refresh Analysis</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {combinationsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+              <span className="ml-3 text-gray-600">Analyzing combinations...</span>
+            </div>
+          ) : combinationsData.length === 0 ? (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <Info className="h-5 w-5 text-yellow-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">No Combinations Found</h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>No variable combinations found with the current filters. Try:</p>
+                    <ul className="list-disc list-inside mt-2">
+                      <li>Reducing the minimum trades requirement</li>
+                      <li>Changing the combination level</li>
+                      <li>Adjusting the date range</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Active Filters */}
+              {activeFilterCount > 0 && (
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H4a1 1 0 01-.8-1.6L5.75 8 3.2 4.6A1 1 0 013 3zm4 8a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-blue-700">
+                        Showing {filterCombinations.length} of {combinationsData.length} combinations matching {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''}
+                      </p>
+                      {renderActiveFilters()}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Best Combinations Summary */}
+              {combinationStats && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {combinationStats.best_by_pnl && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <div className="flex items-center">
+                        <div className="p-3 rounded-full bg-green-100 text-green-600">
+                          <Award className="h-6 w-6" />
+                        </div>
+                        <div className="ml-4">
+                          <p className="text-sm font-medium text-gray-500">Best by P&L</p>
+                          <p className="text-lg font-semibold text-gray-900">
+                            {formatCurrency(combinationStats.best_by_pnl.pnl)}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1 truncate">
+                            {combinationStats.best_by_pnl.combination}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {combinationStats.best_by_win_rate && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <div className="flex items-center">
+                        <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+                          <TrendingUp className="h-6 w-6" />
+                        </div>
+                        <div className="ml-4">
+                          <p className="text-sm font-medium text-gray-500">Best Win Rate</p>
+                          <p className="text-lg font-semibold text-gray-900">
+                            {formatPercent(combinationStats.best_by_win_rate.win_rate)}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1 truncate">
+                            {combinationStats.best_by_win_rate.combination}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {combinationStats.best_by_profit_factor && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <div className="flex items-center">
+                        <div className="p-3 rounded-full bg-purple-100 text-purple-600">
+                          <BarChart3 className="h-6 w-6" />
+                        </div>
+                        <div className="ml-4">
+                          <p className="text-sm font-medium text-gray-500">Best Profit Factor</p>
+                          <p className="text-lg font-semibold text-gray-900">
+                            {combinationStats.best_by_profit_factor.profit_factor?.toFixed(2) || 'N/A'}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1 truncate">
+                            {combinationStats.best_by_profit_factor.combination}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Combination Performance Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* Summary Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 col-span-full">
+                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">Total Combinations</p>
+                        <p className="text-2xl font-bold text-blue-900">{combinationsData.length}</p>
+                      </div>
+                      <div className="p-3 rounded-full bg-blue-600 bg-opacity-20">
+                        <BarChart3 className="h-6 w-6 text-blue-700" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-green-800">Total Trades</p>
+                        <p className="text-2xl font-bold text-green-900">
+                          {combinationsData.reduce((sum, c) => sum + c.trades, 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-full bg-green-600 bg-opacity-20">
+                        <TrendingUp className="h-6 w-6 text-green-700" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-purple-800">Avg Win Rate</p>
+                        <p className="text-2xl font-bold text-purple-900">
+                          {formatPercent(combinationsData.reduce((sum, c) => sum + c.win_rate, 0) / combinationsData.length)}
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-full bg-purple-600 bg-opacity-20">
+                        <Target className="h-6 w-6 text-purple-700" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-r from-amber-50 to-amber-100 p-4 rounded-lg border border-amber-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-amber-800">Best P&L</p>
+                        <p className="text-2xl font-bold text-amber-900">
+                          {combinationsData.length > 0 ? formatCurrency(Math.max(...combinationsData.map(c => c.pnl))) : 'N/A'}
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-full bg-amber-600 bg-opacity-20">
+                        <Award className="h-6 w-6 text-amber-700" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top Combinations by P&L */}
+                <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Top Combinations by P&L</h3>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500">Showing top 10 of {combinationsData.length}</span>
+                    </div>
+                  </div>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                        data={[...combinationsData]
+                          .sort((a, b) => b.pnl - a.pnl)
+                          .slice(0, 10)
+                          .map(combo => ({
+                            name: combo.combination.length > 20 ? 
+                              combo.combination.substring(0, 20) + '...' : 
+                              combo.combination,
+                            pnl: combo.pnl,
+                            trades: combo.trades,
+                            winRate: combo.win_rate * 100, // Convert to percentage
+                            avgRr: combo.avg_rr || 0
+                          }))}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                      >
+                        <defs>
+                          <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#10B981" stopOpacity={0.2}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis 
+                          dataKey="name" 
+                          type="category"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 11, fill: '#6b7280' }}
+                          height={60}
+                          interval={0}
+                          angle={-45}
+                          textAnchor="end"
+                          tickMargin={10}
+                        />
+                        <YAxis 
+                          yAxisId="left"
+                          type="number"
+                          width={80}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 11, fill: '#6b7280' }}
+                          tickFormatter={(value) => formatCurrency(value).replace('$', '')}
+                        />
+                        <YAxis 
+                          yAxisId="right"
+                          orientation="right"
+                          type="number"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fontSize: 11, fill: '#3B82F6' }}
+                          domain={[0, 100]}
+                          tickFormatter={(value) => `${value}%`}
+                        />
+                        <Tooltip 
+                          contentStyle={{
+                            background: 'rgba(255, 255, 255, 0.98)',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '0.5rem',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          }}
+                          formatter={(value, name) => {
+                            if (name === 'P&L') return [
+                              <span key="pnl" className="font-medium" style={{ color: value >= 0 ? '#10B981' : '#EF4444' }}>
+                                {formatCurrency(value)}
+                              </span>, 
+                              name
+                            ];
+                            if (name === 'Win Rate') return [
+                              <span key="winrate" className="font-medium" style={{ color: '#3B82F6' }}>
+                                {`${parseFloat(value).toFixed(1)}%`}
+                              </span>, 
+                              name
+                            ];
+                            if (name === 'Avg R:R') return [
+                              <span key="rr" className="font-medium">
+                                {parseFloat(value).toFixed(2)}
+                              </span>,
+                              name
+                            ];
+                            return [value, name];
+                          }}
+                          labelFormatter={(label) => (
+                            <div className="font-semibold text-gray-700 mb-1 text-sm">
+                              {label}
+                            </div>
+                          )}
+                        />
+                        <Legend 
+                          verticalAlign="top"
+                          height={36}
+                          iconType="circle"
+                          iconSize={10}
+                        />
+                        <Bar 
+                          yAxisId="left"
+                          dataKey="pnl" 
+                          name="P&L" 
+                          fill="url(#barGradient)" 
+                          radius={[4, 4, 0, 0]}
+                          maxBarSize={40}
+                        >
+                          {combinationsData
+                            .sort((a, b) => b.pnl - a.pnl)
+                            .slice(0, 10)
+                            .map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={entry.pnl >= 0 ? 'url(#barGradient)' : '#EF4444'} 
+                              />
+                            ))}
+                        </Bar>
+                        <Line 
+                          yAxisId="right"
+                          type="monotone" 
+                          dataKey="winRate" 
+                          name="Win Rate" 
+                          stroke="#3B82F6" 
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ 
+                            r: 6, 
+                            fill: '#3B82F6',
+                            stroke: '#fff',
+                            strokeWidth: 2,
+                            style: { filter: 'drop-shadow(0px 0px 2px rgba(59, 130, 246, 0.5))' }
+                          }}
+                          strokeDasharray="3 3"
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Win Rate vs P&L Scatter Plot */}
+                <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Win Rate vs P&L</h3>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500">{combinationsData.length} combinations</span>
+                    </div>
+                  </div>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ScatterChart
+                        margin={{ top: 20, right: 30, bottom: 60, left: 20 }}
+                      >
+                        <defs>
+                          <linearGradient id="scatterGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.2}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        
+                        {/* X Axis */}
+                        <XAxis 
+                          type="number" 
+                          dataKey="win_rate" 
+                          name="Win Rate"
+                          label={{ 
+                            value: 'Win Rate (%)', 
+                            position: 'bottom', 
+                            offset: 40,
+                            fill: '#6b7280',
+                            fontSize: 12,
+                            fontWeight: 500
+                          }}
+                          domain={[0, 100]}
+                          tick={{ fontSize: 11, fill: '#6b7280' }}
+                          tickLine={false}
+                          axisLine={{ stroke: '#e5e7eb' }}
+                          tickFormatter={(value) => `${value}%`}
+                        />
+                        
+                        {/* Y Axis */}
+                        <YAxis 
+                          type="number" 
+                          dataKey="pnl" 
+                          name="P&L"
+                          label={{ 
+                            value: 'P&L ($)', 
+                            angle: -90, 
+                            position: 'insideLeft',
+                            offset: 10,
+                            fill: '#6b7280',
+                            fontSize: 12,
+                            fontWeight: 500
+                          }}
+                          tick={{ fontSize: 11, fill: '#6b7280' }}
+                          tickLine={false}
+                          axisLine={{ stroke: '#e5e7eb' }}
+                          tickFormatter={(value) => formatCurrency(value).replace('$', '')}
+                        />
+                        
+                        {/* Z Axis for bubble size */}
+                        <ZAxis 
+                          type="number" 
+                          dataKey="trades" 
+                          range={[60, 600]}
+                          name="Trades"
+                        />
+                        
+                        {/* Reference Lines */}
+                        <ReferenceLine 
+                          y={0} 
+                          stroke="#9ca3af" 
+                          strokeDasharray="3 3" 
+                          strokeWidth={1}
+                        />
+                        <ReferenceLine 
+                          x={50} 
+                          stroke="#9ca3af" 
+                          strokeDasharray="3 3" 
+                          strokeWidth={1}
+                        />
+                        
+                        <Tooltip 
+                          cursor={{ strokeDasharray: '3 3' }}
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const isProfitable = data.pnl >= 0;
+                              const hasGoodWinRate = data.win_rate >= 50;
+                              
+                              return (
+                                <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-xl">
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <div className={`w-3 h-3 rounded-full ${
+                                      isProfitable && hasGoodWinRate ? 'bg-green-500' : 
+                                      isProfitable ? 'bg-blue-500' : 
+                                      hasGoodWinRate ? 'bg-yellow-500' : 'bg-red-500'
+                                    }`}></div>
+                                    <p className="font-semibold text-gray-900 text-sm">
+                                      {data.combination.length > 40 ? 
+                                       `${data.combination.substring(0, 40)}...` : data.combination}
+                                    </p>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div className="space-y-1">
+                                      <p className="text-gray-500">P&L:</p>
+                                      <p className={isProfitable ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                                        {formatCurrency(data.pnl)}
+                                      </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-gray-500">Win Rate:</p>
+                                      <p className={data.win_rate >= 50 ? 'text-blue-600 font-medium' : 'text-amber-600 font-medium'}>
+                                        {data.win_rate.toFixed(1)}%
+                                      </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-gray-500">Trades:</p>
+                                      <p className="font-medium text-gray-700">{data.trades}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-gray-500">Avg R:R:</p>
+                                      <p className="font-medium text-gray-700">
+                                        {data.avg_rr ? data.avg_rr.toFixed(2) : 'N/A'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="mt-3 pt-2 border-t border-gray-100 text-xs text-gray-500">
+                                    <p>Click and drag to zoom in • Double click to reset</p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend />
+                        <Scatter 
+                          name="Combinations" 
+                          data={combinationsData} 
+                          fill="#8884d8"
+                          fillOpacity={0.6}
+                        >
+                          {combinationsData.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={
+                                entry.pnl >= 0 
+                                  ? entry.win_rate >= 50 
+                                    ? '#10B981' // Green for profitable with good win rate
+                                    : '#3B82F6' // Blue for profitable with lower win rate
+                                  : entry.win_rate >= 50
+                                    ? '#F59E0B' // Yellow for losing but good win rate
+                                    : '#EF4444' // Red for losing with low win rate
+                              }
+                            />
+                          ))}
+                        </Scatter>
+                        <ReferenceLine y={0} stroke="#6B7280" strokeDasharray="3 3" />
+                        <ReferenceLine x={50} stroke="#6B7280" strokeDasharray="3 3">
+                          <Label value="50% Win Rate" position="insideBottomRight" offset={5} />
+                        </ReferenceLine>
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-4 text-xs text-gray-600">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                      <span>Profitable + Win Rate ≥ 50%</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                      <span>Profitable + Win Rate {'<'} 50%</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                      <span>Losing + Win Rate ≥ 50%</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                      <span>Losing + Win Rate {'<'} 50%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance Radar Chart */}
+              <div className="bg-white p-6 rounded-lg shadow border border-gray-200 mb-8">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Performance Radar Comparison</h3>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">Top 5 combinations by P&L</span>
+                  </div>
+                </div>
+                <div className="h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart 
+                      cx="50%" 
+                      cy="50%" 
+                      outerRadius="80%"
+                      data={[
+                        { 
+                          subject: 'Win Rate', 
+                          A: 0, 
+                          fullMark: 100,
+                          format: (v) => `${v.toFixed(1)}%`,
+                          color: (v) => v > 50 ? '#10b981' : v > 40 ? '#f59e0b' : '#ef4444',
+                          icon: (v) => v > 50 ? '🏆' : v > 40 ? '📊' : '📉',
+                          description: 'Percentage of winning trades'
+                        },
+                        { 
+                          subject: 'P&L', 
+                          A: 0, 
+                          fullMark: Math.max(1, ...combinationsData.map(c => Math.abs(c.pnl))),
+                          format: formatCurrency,
+                          color: (v) => v >= 0 ? '#10b981' : '#ef4444',
+                          icon: (v) => v >= 0 ? '💰' : '💸',
+                          description: 'Total profit/loss amount'
+                        },
+                        { 
+                          subject: 'Trades', 
+                          A: 0, 
+                          fullMark: Math.ceil(Math.max(10, ...combinationsData.map(c => c.trades)) * 1.1),
+                          format: (v) => Math.round(v),
+                          color: () => '#3b82f6',
+                          icon: () => '📋',
+                          description: 'Number of trades'
+                        },
+                        { 
+                          subject: 'Avg R:R', 
+                          A: 0, 
+                          fullMark: Math.max(3, ...combinationsData.map(c => c.avg_rr || 0)) * 1.2,
+                          format: (v) => v.toFixed(2),
+                          color: (v) => v >= 1.5 ? '#10b981' : v >= 1 ? '#f59e0b' : '#ef4444',
+                          icon: (v) => v >= 1.5 ? '📈' : v >= 1 ? '↗️' : '↘️',
+                          description: 'Average risk to reward ratio'
+                        },
+                        { 
+                          subject: 'Profit Factor', 
+                          A: 0, 
+                          fullMark: Math.max(3, ...combinationsData.map(c => c.profit_factor || 0)) * 1.2,
+                          format: (v) => v.toFixed(2),
+                          color: (v) => v >= 2 ? '#10b981' : v >= 1.5 ? '#f59e0b' : '#ef4444',
+                          icon: (v) => v >= 2 ? '🚀' : v >= 1.5 ? '📊' : '📉',
+                          description: 'Gross profit divided by gross loss'
+                        },
+                      ]}
+                      margin={{ top: 20, right: 40, left: 40, bottom: 20 }}
+                    >
+                      <defs>
+                        {/* Glow effects */}
+                        <filter id="radar-glow" x="-50%" y="-50%" width="200%" height="200%">
+                          <feGaussianBlur stdDeviation="3" result="blur" />
+                          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                        
+                        {/* Background pattern */}
+                        <pattern id="radar-pattern" patternUnits="userSpaceOnUse" width="20" height="20">
+                          <path d="M 0,20 L 20,0 M -5,5 L 5,-5 M 15,25 L 25,15 M 25,5 L 35,-5" 
+                                stroke="rgba(0, 0, 0, 0.03)" 
+                                strokeWidth="0.5" 
+                                shapeRendering="crispEdges" />
+                        </pattern>
+                        
+                        {/* Custom gradients for each radar series */}
+                        {combinationsData
+                          .sort((a, b) => b.pnl - a.pnl)
+                          .slice(0, 5)
+                          .map((_, index) => {
+                            const color = COLORS[index % COLORS.length];
+                            return (
+                              <React.Fragment key={`gradients-${index}`}>
+                                <linearGradient 
+                                  id={`radar-fill-${index}`} 
+                                  x1="0" 
+                                  y1="0" 
+                                  x2="0" 
+                                  y2="1"
+                                >
+                                  <stop offset="0%" stopColor={color} stopOpacity={0.4} />
+                                  <stop offset="100%" stopColor={color} stopOpacity={0.1} />
+                                </linearGradient>
+                                <linearGradient 
+                                  id={`radar-stroke-${index}`} 
+                                  x1="0" 
+                                  y1="0" 
+                                  x2="0" 
+                                  y2="1"
+                                >
+                                  <stop offset="0%" stopColor={color} stopOpacity={0.8} />
+                                  <stop offset="100%" stopColor={color} stopOpacity={0.6} />
+                                </linearGradient>
+                              </React.Fragment>
+                            );
+                          })}
+                      </defs>
+                      
+                      <PolarGrid 
+                        stroke="#e5e7eb" 
+                        strokeDasharray="3 3"
+                        polarRadius={[0, '25%', '50%', '75%']}
+                        strokeWidth={0.5}
+                        strokeOpacity={0.7}
+                      />
+                      
+                      <PolarAngleAxis 
+                        dataKey="subject" 
+                        tick={{
+                          fontSize: 11,
+                          fill: '#4b5563',
+                          fontWeight: 500,
+                          letterSpacing: '0.025em'
+                        }}
+                        axisLine={{
+                          stroke: '#e5e7eb',
+                          strokeWidth: 0.5
+                        }}
+                      />
+                      
+                      <PolarRadiusAxis 
+                        angle={30} 
+                        domain={[0, 'dataMax + 10']}
+                        tick={{
+                          fontSize: 10,
+                          fill: '#6b7280',
+                          fontWeight: 400
+                        }}
+                        axisLine={{
+                          stroke: '#e5e7eb',
+                          strokeWidth: 0.5
+                        }}
+                        tickFormatter={(value, index, payloadInfo) => {
+                          const payload = payloadInfo?.payload || {};
+                          if (payload.subject === 'Win Rate') return `${value}%`;
+                          if (payload.subject === 'P&L') return formatCurrency(value).replace('$', '');
+                          if (payload.subject === 'Trades') return value;
+                          if (payload.subject === 'Avg R:R') return value.toFixed(1);
+                          if (payload.subject === 'Profit Factor') return value.toFixed(1);
+                          if (typeof value === 'number') return value.toFixed(1);
+                          return value;
+                        }}
+                      />
+                      
+                      <Tooltip 
+                        contentStyle={{
+                          background: 'rgba(255, 255, 255, 0.98)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          border: '1px solid rgba(0, 0, 0, 0.05)',
+                          borderRadius: '0.5rem',
+                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem',
+                          fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+                        }}
+                        itemStyle={{
+                          padding: '0.25rem 0',
+                          textTransform: 'capitalize'
+                        }}
+                        formatter={(value, name, props) => {
+                          const { payload } = props;
+                          let formattedValue = value;
+                          let color = '#1f2937';
+                          
+                          // Format values based on metric type
+                          if (payload.subject === 'Win Rate') {
+                            formattedValue = `${value.toFixed(1)}%`;
+                            color = value > 50 ? '#10b981' : value > 40 ? '#f59e0b' : '#ef4444';
+                          } 
+                          else if (payload.subject === 'P&L') {
+                            formattedValue = formatCurrency(value);
+                            color = value >= 0 ? '#10b981' : '#ef4444';
+                          }
+                          else if (payload.subject === 'Trades') {
+                            formattedValue = value;
+                          }
+                          else if (payload.subject === 'Avg R:R') {
+                            formattedValue = value.toFixed(2);
+                            color = value >= 1.5 ? '#10b981' : value >= 1 ? '#f59e0b' : '#ef4444';
+                          }
+                          else if (payload.subject === 'Profit Factor') {
+                            formattedValue = value.toFixed(2);
+                            color = value >= 2 ? '#10b981' : value >= 1.5 ? '#f59e0b' : '#ef4444';
+                          } else {
+                            formattedValue = value.toFixed(2);
+                          }
+                          
+                          return [
+                            <span key="value" className="font-medium" style={{ color }}>
+                              {formattedValue}
+                            </span>,
+                            <span key="label" className="text-gray-500 ml-2">
+                              {payload.subject}
+                            </span>
+                          ];
+                        }}
+                        labelFormatter={(label) => {
+                          const combo = combinationsData.find(c => c.combination === label);
+                          const color = COLORS[combinationsData.indexOf(combo) % COLORS.length];
+                          return (
+                            <div className="flex items-center">
+                              <div 
+                                className="w-3 h-3 rounded-full mr-2 flex-shrink-0" 
+                                style={{ backgroundColor: color }}
+                              />
+                              <span className="font-semibold text-gray-800 truncate max-w-[180px]">
+                                {label}
+                              </span>
+                            </div>
+                          );
+                        }}
+                      />
+                      
+                      {combinationsData
+                        .sort((a, b) => b.pnl - a.pnl)
+                        .slice(0, 5)
+                        .map((combo, index) => {
+                          const color = COLORS[index % COLORS.length];
+                          const data = [
+                            { subject: 'Win Rate', [combo.combination]: combo.win_rate * 100 },
+                            { subject: 'P&L', [combo.combination]: Math.abs(combo.pnl) },
+                            { subject: 'Trades', [combo.combination]: combo.trades },
+                            { subject: 'Avg R:R', [combo.combination]: combo.avg_rr || 0 },
+                            { subject: 'Profit Factor', [combo.combination]: combo.profit_factor || 0 },
+                          ];
+                          
+                          const isActive = activeCombination === null || activeCombination === combo.combination;
+                          const opacity = isActive ? 1 : 0.3;
+                          
+                          return (
+                            <Radar
+                              key={combo.combination}
+                              name={combo.combination}
+                              dataKey={combo.combination}
+                              data={data}
+                              stroke={color}
+                              fill={`url(#radar-gradient-${index})`}
+                              strokeWidth={isActive ? 2.5 : 1.5}
+                              fillOpacity={isActive ? 0.4 : 0.15}
+                              strokeOpacity={opacity}
+                              dot={{
+                                fill: color,
+                                stroke: '#fff',
+                                strokeWidth: 1.5,
+                                r: isActive ? 4 : 3,
+                                opacity: isActive ? 1 : 0.7,
+                                style: { 
+                                  filter: isActive ? 'drop-shadow(0px 0px 3px rgba(0, 0, 0, 0.3))' : 'none',
+                                  transition: 'all 0.2s ease-in-out'
+                                }
+                              }}
+                              activeDot={{
+                                fill: '#fff',
+                                stroke: color,
+                                strokeWidth: 2,
+                                r: 6,
+                                style: { 
+                                  filter: `drop-shadow(0 0 5px ${color}80)`,
+                                  transition: 'all 0.2s ease-in-out'
+                                }
+                              }}
+                              onMouseEnter={() => setActiveCombination(combo.combination)}
+                              onMouseLeave={() => setActiveCombination(null)}
+                              onClick={() => {
+                                setActiveCombination(prev => 
+                                  prev === combo.combination ? null : combo.combination
+                                );
+                              }}
+                              style={{
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease-in-out',
+                                filter: isActive ? 'url(#radar-glow)' : 'none'
+                              }}
+                            />
+                          );
+                        })}
+                      
+                      {/* Custom Interactive Legend */}
+                      <div className="flex flex-wrap justify-center gap-3 mt-4 mb-2 px-4">
+                        {combinationsData
+                          .sort((a, b) => b.pnl - a.pnl)
+                          .slice(0, 5)
+                          .map((combo, index) => {
+                            const isActive = activeCombination === null || activeCombination === combo.combination;
+                            const color = COLORS[index % COLORS.length];
+                            const pnlPercent = ((combo.pnl / Math.max(1, Math.max(...combinationsData.map(c => Math.abs(c.pnl))))) * 100).toFixed(0);
+                            
+                            return (
+                              <div 
+                                key={`legend-${index}`}
+                                className={`flex flex-col items-center px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-200 ${
+                                  isActive ? 'bg-opacity-10' : 'opacity-40'
+                                }`}
+                                style={{
+                                  backgroundColor: isActive ? `${color}15` : 'transparent',
+                                  border: `1px solid ${isActive ? `${color}80` : `${color}40`}`,
+                                  transform: isActive ? 'translateY(-2px)' : 'none',
+                                  boxShadow: isActive ? `0 4px 12px ${color}20` : 'none',
+                                  minWidth: '120px'
+                                }}
+                                onClick={() => setActiveCombination(isActive && activeCombination !== combo.combination ? null : combo.combination)}
+                                onMouseEnter={() => setActiveCombination(combo.combination)}
+                                onMouseLeave={() => activeCombination === combo.combination && setActiveCombination(null)}
+                              >
+                                <div className="flex items-center w-full justify-between">
+                                  <div className="flex items-center">
+                                    <div 
+                                      className="w-3 h-3 rounded-full mr-2 flex-shrink-0" 
+                                      style={{ backgroundColor: color }}
+                                    />
+                                    <span 
+                                      className="text-xs font-medium whitespace-nowrap truncate"
+                                      style={{ color: isActive ? color : '#6b7280' }}
+                                      title={combo.combination}
+                                    >
+                                      {combo.combination.length > 12 ? 
+                                        `${combo.combination.substring(0, 10)}...` : 
+                                        combo.combination}
+                                    </span>
+                                  </div>
+                                  <span 
+                                    className="text-xs font-semibold ml-2"
+                                    style={{ color: combo.pnl >= 0 ? '#10b981' : '#ef4444' }}
+                                  >
+                                    {combo.pnl >= 0 ? '+' : ''}{formatCurrency(combo.pnl)}
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                                  <div 
+                                    className="h-full rounded-full" 
+                                    style={{
+                                      width: `${Math.min(100, Math.abs(pnlPercent))}%`,
+                                      backgroundColor: combo.pnl >= 0 ? '#10b981' : '#ef4444',
+                                      opacity: isActive ? 1 : 0.6
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                      
+                      <Legend 
+                        layout="vertical"
+                        verticalAlign="middle"
+                        align="right"
+                        wrapperStyle={{
+                          paddingLeft: '20px',
+                          fontSize: '12px',
+                          maxWidth: '220px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: '1px solid #e5e7eb',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+                        }}
+                        iconSize={12}
+                        iconType="circle"
+                        formatter={(value, entry, index) => {
+                          const isActive = activeCombination === null || activeCombination === value;
+                          const color = COLORS[index % COLORS.length];
+                          return (
+                            <div 
+                              className={`flex items-center py-1 px-2 rounded-md transition-colors ${isActive ? 'bg-gray-50' : 'opacity-60'}`}
+                              style={{
+                                borderLeft: `3px solid ${isActive ? color : 'transparent'}`,
+                                cursor: 'pointer'
+                              }}
+                              onClick={() => {
+                                setActiveCombination(prev => 
+                                  prev === value ? null : value
+                                );
+                              }}
+                            >
+                              <div 
+                                className="w-2.5 h-2.5 rounded-full mr-2 flex-shrink-0" 
+                                style={{ 
+                                  backgroundColor: color,
+                                  opacity: isActive ? 1 : 0.6
+                                }}
+                              />
+                              <span 
+                                className="truncate" 
+                                style={{
+                                  color: isActive ? '#1f2937' : '#6b7280',
+                                  fontWeight: isActive ? 500 : 400
+                                }}
+                              >
+                                {value.length > 20 ? `${value.substring(0, 20)}...` : value}
+                              </span>
+                              {!isActive && (
+                                <span className="ml-auto text-xs text-gray-400">
+                                  {Math.round(combinationsData.find(c => c.combination === value)?.pnl || 0)}%
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4 text-xs text-gray-500 text-center">
+                  <p>Hover over the chart to see exact values for each metric</p>
+                  <p className="mt-1">The further the point is from the center, the better the performance</p>
+                </div>
+              </div>
+
+              {/* Combinations Table */}
+              <div className="bg-white shadow-md rounded-lg overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Variable Combinations ({combinationsData.length} found)
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Combination
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Trades
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Win Rate
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          P&L
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Profit Factor
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Avg R:R
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Expectancy
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {combinationsData.slice(0, 50).map((combo, index) => (
+                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            <div className="max-w-xs">
+                              <div className="truncate font-medium">{combo.combination}</div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {combo.variable_components?.join(', ')}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {combo.trades}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              combo.win_rate >= 60 ? 'bg-green-100 text-green-800' :
+                              combo.win_rate >= 40 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {formatPercent(combo.win_rate)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <span className={combo.pnl >= 0 ? 'text-green-600' : 'text-red-600'}>
+                              {formatCurrency(combo.pnl)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {combo.profit_factor !== null ? combo.profit_factor.toFixed(2) : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatRiskReward(combo.avg_rr)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span className={combo.expectancy >= 0 ? 'text-green-600' : 'text-red-600'}>
+                              {formatCurrency(combo.expectancy)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
