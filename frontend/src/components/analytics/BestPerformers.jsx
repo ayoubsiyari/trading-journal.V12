@@ -2,14 +2,6 @@ import React from 'react';
 import { BarChart3, TrendingUp, Clock, Loader2 } from 'lucide-react';
 
 const BestPerformers = ({ bestSetup, bestInstrument, bestTimeOfDay, loading }) => {
-  // Format time to AM/PM
-  const formatTime = (hour) => {
-    if (hour === undefined || hour === null) return 'N/A';
-    const period = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12; // Convert 0-23 to 12-hour format
-    return `${displayHour}:00 ${period}`;
-  };
-
   // Format week range for display (e.g., "Jun 1 - Jun 7, 2023")
   const formatWeekRange = (weekRange) => {
     if (!weekRange) return 'N/A';
