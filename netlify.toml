@@ -1,15 +1,45 @@
 [build]
-  command = "cd frontend && npm install && npm run build"
+  command = "cd frontend && npm ci && CI=false npm run build"
   publish = "frontend/build"
 
 [build.environment]
-  NODE_VERSION = "18.0.0"
-  NPM_VERSION = "9.0.0"
+  NODE_VERSION = "18.20.0"
+  NPM_VERSION = "10.0.0"
+  CI = "false"
+  NODE_OPTIONS = "--max_old_space_size=4096"
+
+[build.processing]
+  skip_processing = false
+
+[build.processing.css]
+  bundle = true
+  minify = true
+
+[build.processing.js]
+  bundle = true
+  minify = true
+
+[build.processing.html]
+  pretty_urls = true
+  canonical_urls = true
+
+[build.processing.images]
+  compress = true
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  force = false
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "same-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://trading-journal-v12.onrender.com;"
 
 [dev]
   framework = "#custom"
@@ -17,3 +47,16 @@
   port = 3000
   targetPort = 3000
   publish = "frontend/build"
+  targetPort = 3000
+
+[context.production.environment]
+  NODE_ENV = "production"
+  REACT_APP_API_BASE_URL = "https://trading-journal-v12.onrender.com"
+
+[context.deploy-preview.environment]
+  NODE_ENV = "production"
+  REACT_APP_API_BASE_URL = "https://trading-journal-v12.onrender.com"
+
+[context.branch-deploy.environment]
+  NODE_ENV = "production"
+  REACT_APP_API_BASE_URL = "https://trading-journal-v12.onrender.com"
