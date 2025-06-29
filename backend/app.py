@@ -24,8 +24,17 @@ jwt = JWTManager(app)
 # DB setup
 db.init_app(app)
 
-# CORS setup
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+# CORS setup - Configured to allow all origins for now
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["*"],  # Allow all origins
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True,
+        "expose_headers": ["Content-Type", "X-Total-Count"],
+        "max_age": 600
+    }
+})
 
 # Register routes
 app.register_blueprint(auth_bp,    url_prefix='/api/auth')
@@ -35,7 +44,7 @@ app.register_blueprint(admin_bp,   url_prefix='/api/admin')   # ← register adm
 
 @app.route('/')
 def home():
-    return {"status": "✅ Backend Running"}
+    return {"status": "✅ Backend Running", "cors_configured": True, "environment": app.config.get('ENV', 'development')}
 
 # JWT error handlers
 @jwt.invalid_token_loader
@@ -75,9 +84,14 @@ def debug_verify_token():
             "error": str(e)
         })
 
+@app.before_request
+def log_request_info():
+    app.logger.debug('Headers: %s', request.headers)
+    app.logger.debug('Body: %s', request.get_data())
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         print("✅ Tables created:", db.metadata.tables.keys())
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
