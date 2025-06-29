@@ -5,9 +5,9 @@
 # ----- Frontend build stage -----
 FROM node:20 AS frontend-build
 WORKDIR /app/frontend
-COPY trading-journal/frontend/package*.json ./
+COPY frontend/package*.json ./
 RUN npm ci
-COPY trading-journal/frontend ./
+COPY frontend/ ./
 RUN npm run build
 
 # ----- Backend stage (dependencies) -----
@@ -15,11 +15,11 @@ FROM python:3.11-slim AS backend-build
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 WORKDIR /app
-COPY trading-journal/backend/requirements.txt ./requirements.txt
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend source
-COPY trading-journal/backend ./backend
+COPY backend/ ./backend
 
 # Copy frontend static build into backend static folder
 COPY --from=frontend-build /app/frontend/build ./backend/static
