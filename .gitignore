@@ -1,15 +1,35 @@
 # Dependencies
 node_modules/
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Environment variables
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# Environment variables and secrets
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+secrets.ini
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
 
 # Build files
 /build
