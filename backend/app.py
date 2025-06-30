@@ -1,7 +1,7 @@
 # app.py
 
-from flask import Flask, jsonify, request
-from flask_cors import CORS
+from flask import Flask, jsonify, request, make_response
+from flask_cors import CORS, cross_origin
 from flask_jwt_extended import JWTManager
 from models import db
 from config import Config
@@ -24,10 +24,14 @@ jwt = JWTManager(app)
 # DB setup
 db.init_app(app)
 
-# CORS setup - Configured to allow all origins for now
-CORS(app, resources={
+# CORS setup - Configured to allow all origins
+app.config['CORS_HEADERS'] = 'Content-Type, Authorization'
+app.config['CORS_SUPPORTS_CREDENTIALS'] = True
+
+# Enable CORS for all routes
+cors = CORS(app, resources={
     r"/api/*": {
-        "origins": ["*"],  # Allow all origins
+        "origins": ["*"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True,
@@ -42,8 +46,16 @@ app.register_blueprint(journal_bp, url_prefix='/api/journal')
 app.register_blueprint(profile_bp, url_prefix='/api/auth/profile')
 app.register_blueprint(admin_bp,   url_prefix='/api/admin')   # ← register admin
 
-@app.route('/')
+@app.route('/', methods=['GET', 'OPTIONS'])
+@cross_origin()
 def home():
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
     return {"status": "✅ Backend Running", "cors_configured": True, "environment": app.config.get('ENV', 'development')}
 
 # JWT error handlers
@@ -88,6 +100,17 @@ def debug_verify_token():
 def log_request_info():
     app.logger.debug('Headers: %s', request.headers)
     app.logger.debug('Body: %s', request.get_data())
+
+# Add a catch-all route to handle OPTIONS for all paths
+@app.route('/<path:path>', methods=['OPTIONS'])
+@cross_origin()
+def options_handler(path):
+    response = make_response()
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 if __name__ == '__main__':
     with app.app_context():

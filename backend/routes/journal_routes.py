@@ -237,7 +237,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Configure OpenAI API Key
 # Make sure to set the OPENAI_API_KEY environment variable
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+openai.api_key = os.environ.get("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")
 
 
 @journal_bp.route('/add', methods=['POST'])
@@ -2205,6 +2205,8 @@ def performance_highlights():
     except Exception as e:
         print(f"Error in performance_highlights: {str(e)}")
         return jsonify({"error": "Failed to generate performance highlights"}), 500
+
+
 @journal_bp.route('/report-data', methods=['GET'])
 @jwt_required()
 def report_data():
@@ -2324,163 +2326,6 @@ def report_data():
         print(' report_data error:', e)
         return jsonify({'error': str(e)}), 500
 
-# ─── Streak Analysis ────────────────────────────────────────────────────────
-@journal_bp.route('/streaks', methods=['GET'])
-@jwt_required()
-def streak_analysis():
-    """
-    Calculate and return streak analysis for the user's trades.
-    
-    Returns:
-    {
-        "current_streak": {
-            "type": "winning" | "losing" | "none",
-            "count": int,
-            "start_date": "YYYY-MM-DD" | null,
-            "end_date": "YYYY-MM-DD" | null,
-            "pnl": float
-        },
-        "longest_winning_streak": {
-            "count": int,
-            "start_date": "YYYY-MM-DD" | null,
-            "end_date": "YYYY-MM-DD" | null,
-            "pnl": float
-        },
-        "longest_losing_streak": {
-            "count": int,
-            "start_date": "YYYY-MM-DD" | null,
-            "end_date": "YYYY-MM-DD" | null,
-            "pnl": float
-        },
-        "all_streaks": [
-            {
-                "type": "winning" | "losing",
-                "count": int,
-                "start_date": "YYYY-MM-DD",
-                "end_date": "YYYY-MM-DD",
-                "pnl": float
-            },
-            ...
-        ]
-    }
-    """
-    try:
-        user_id = int(get_jwt_identity())
-        
-        # Get all trades ordered by date
-        entries = (
-            JournalEntry.query
-            .filter_by(user_id=user_id)
-            .order_by(JournalEntry.created_at.asc())
-            .all()
-        )
-        
-        if not entries:
-            return jsonify({
-                "current_streak": {"type": "none", "count": 0, "start_date": None, "end_date": None, "pnl": 0},
-                "longest_winning_streak": {"count": 0, "start_date": None, "end_date": None, "pnl": 0},
-                "longest_losing_streak": {"count": 0, "start_date": None, "end_date": None, "pnl": 0},
-                "all_streaks": []
-            })
-        
-        streaks = []
-        current_streak = None
-        
-        for entry in entries:
-            if entry.pnl is None:
-                continue
-                
-            is_win = entry.pnl > 0
-            entry_date = entry.created_at.strftime('%Y-%m-%d')
-            
-            # Initialize first streak
-            if current_streak is None:
-                current_streak = {
-                    'type': 'winning' if is_win else 'losing',
-                    'count': 1,
-                    'start_date': entry_date,
-                    'end_date': entry_date,
-                    'pnl': entry.pnl
-                }
-                continue
-            
-            # Continue current streak
-            if (current_streak['type'] == 'winning' and is_win) or \
-               (current_streak['type'] == 'losing' and not is_win):
-                current_streak['count'] += 1
-                current_streak['end_date'] = entry_date
-                current_streak['pnl'] += entry.pnl
-            # Start new streak
-            else:
-                streaks.append(current_streak)
-                current_streak = {
-                    'type': 'winning' if is_win else 'losing',
-                    'count': 1,
-                    'start_date': entry_date,
-                    'end_date': entry_date,
-                    'pnl': entry.pnl
-                }
-        
-        # Add the last streak
-        if current_streak:
-            streaks.append(current_streak)
-        
-        if not streaks:
-            return jsonify({
-                "current_streak": {"type": "none", "count": 0, "start_date": None, "end_date": None, "pnl": 0},
-                "longest_winning_streak": {"count": 0, "start_date": None, "end_date": None, "pnl": 0},
-                "longest_losing_streak": {"count": 0, "start_date": None, "end_date": None, "pnl": 0},
-                "all_streaks": []
-            })
-        
-        # Find longest winning and losing streaks
-        winning_streaks = [s for s in streaks if s['type'] == 'winning']
-        losing_streaks = [s for s in streaks if s['type'] == 'losing']
-        
-        longest_winning = max(winning_streaks, key=lambda x: x['count']) if winning_streaks else \
-            {"count": 0, "start_date": None, "end_date": None, "pnl": 0}
-        longest_losing = max(losing_streaks, key=lambda x: x['count']) if losing_streaks else \
-            {"count": 0, "start_date": None, "end_date": None, "pnl": 0}
-        
-        # Current streak is the last one in the list
-        current = streaks[-1] if streaks else {"type": "none", "count": 0, "start_date": None, "end_date": None, "pnl": 0}
-        
-        # Format the response
-        response = {
-            "current_streak": {
-                "type": current.get('type', 'none'),
-                "count": current.get('count', 0),
-                "start_date": current.get('start_date'),
-                "end_date": current.get('end_date'),
-                "pnl": round(current.get('pnl', 0), 2)
-            },
-            "longest_winning_streak": {
-                "count": longest_winning.get('count', 0),
-                "start_date": longest_winning.get('start_date'),
-                "end_date": longest_winning.get('end_date'),
-                "pnl": round(longest_winning.get('pnl', 0), 2)
-            },
-            "longest_losing_streak": {
-                "count": longest_losing.get('count', 0),
-                "start_date": longest_losing.get('start_date'),
-                "end_date": longest_losing.get('end_date'),
-                "pnl": round(longest_losing.get('pnl', 0), 2)
-            },
-            "all_streaks": [{
-                "type": s['type'],
-                "count": s['count'],
-                "start_date": s['start_date'],
-                "end_date": s['end_date'],
-                "pnl": round(s['pnl'], 2)
-            } for s in streaks]
-        }
-        
-        return jsonify(response), 200
-        
-    except Exception as e:
-        print(' streak_analysis error:', e)
-        return jsonify({'error': str(e)}), 500
-
 # ─── Exit Analysis ────────────────────────────────────────────────────────────
 
 @journal_bp.route('/trade/<int:trade_id>/exit-analysis', methods=['GET'])
@@ -2559,6 +2404,167 @@ def exit_analysis(trade_id):
     except Exception as e:
         print(f"exit_analysis error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# ─── Streak Analysis ───────────────────────────────────────────────────────
+@journal_bp.route('/streaks', methods=['GET'])
+@jwt_required()
+def streak_analysis():
+    """
+    Calculate and return streak statistics for the current user's trades.
+    
+    Returns:
+        JSON with streak statistics including current streak, longest winning/losing streaks,
+        and distribution of streaks.
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        
+        # Get all trades ordered by date
+        entries = (
+            JournalEntry.query
+            .filter_by(user_id=user_id)
+            .order_by(JournalEntry.date.asc())
+            .all()
+        )
+        
+        if not entries:
+            return jsonify({
+                'total_trades': 0,
+                'winning_trades': 0,
+                'win_rate': 0,
+                'current_streak': {'type': None, 'count': 0, 'start_date': None, 'end_date': None},
+                'longest_winning_streak': {'count': 0, 'pnl': 0, 'start_date': None, 'end_date': None},
+                'longest_losing_streak': {'count': 0, 'pnl': 0, 'start_date': None, 'end_date': None},
+                'winning_streaks': [],
+                'losing_streaks': []
+            })
+        
+        # Initialize streak tracking
+        current_streak = {'type': None, 'count': 0, 'start_date': None, 'end_date': None}
+        winning_streaks = []
+        losing_streaks = []
+        
+        # Track longest streaks
+        longest_winning = {'count': 0, 'pnl': 0, 'start_date': None, 'end_date': None}
+        longest_losing = {'count': 0, 'pnl': 0, 'start_date': None, 'end_date': None}
+        
+        # Counters for win rate
+        winning_trades = 0
+        valid_trades = 0  # Trades with valid PnL (not None)
+        
+        for entry in entries:
+            if entry.pnl is None:
+                continue  # Skip trades with no PnL
+                
+            valid_trades += 1
+            is_win = entry.pnl > 0  # Only consider trades with PnL > 0 as wins
+            if is_win:
+                winning_trades += 1
+            
+            # Handle current streak
+            if current_streak['type'] is None:
+                # Start new streak
+                current_streak = {
+                    'type': 'winning' if is_win else 'losing',
+                    'count': 1,
+                    'start_date': entry.date.isoformat(),
+                    'end_date': entry.date.isoformat(),
+                    'pnl': float(entry.pnl) if entry.pnl else 0.0
+                }
+            elif (current_streak['type'] == 'winning' and is_win) or \
+                 (current_streak['type'] == 'losing' and not is_win):
+                # Continue current streak
+                current_streak['count'] += 1
+                current_streak['end_date'] = entry.date.isoformat()
+                current_streak['pnl'] += float(entry.pnl) if entry.pnl else 0.0
+            else:
+                # End current streak and start new one - only keep streaks with count > 1
+                if current_streak['count'] > 1:
+                    if current_streak['type'] == 'winning':
+                        winning_streaks.append(current_streak)
+                        if current_streak['count'] > longest_winning['count']:
+                            longest_winning = {
+                                'count': current_streak['count'],
+                                'pnl': current_streak['pnl'],
+                                'start_date': current_streak['start_date'],
+                                'end_date': current_streak['end_date']
+                            }
+                    else:
+                        losing_streaks.append(current_streak)
+                        if current_streak['count'] > longest_losing['count']:
+                            longest_losing = {
+                                'count': current_streak['count'],
+                                'pnl': current_streak['pnl'],
+                                'start_date': current_streak['start_date'],
+                                'end_date': current_streak['end_date']
+                            }
+                
+                # Start new streak
+                current_streak = {
+                    'type': 'winning' if is_win else 'losing',
+                    'count': 1,
+                    'start_date': entry.date.isoformat(),
+                    'end_date': entry.date.isoformat(),
+                    'pnl': float(entry.pnl) if entry.pnl else 0.0
+                }
+        
+        # Don't forget to add the last streak if it's longer than 1 trade
+        if current_streak['count'] > 1:
+            if current_streak['type'] == 'winning':
+                winning_streaks.append(current_streak)
+                if current_streak['count'] > longest_winning['count']:
+                    longest_winning = {
+                        'count': current_streak['count'],
+                        'pnl': current_streak['pnl'],
+                        'start_date': current_streak['start_date'],
+                        'end_date': current_streak['end_date']
+                    }
+            else:
+                losing_streaks.append(current_streak)
+                if current_streak['count'] > longest_losing['count']:
+                    longest_losing = {
+                        'count': current_streak['count'],
+                        'pnl': current_streak['pnl'],
+                        'start_date': current_streak['start_date'],
+                        'end_date': current_streak['end_date']
+                    }
+        
+        # Calculate win rate based on valid trades only
+        win_rate = round(winning_trades / valid_trades * 100, 2) if valid_trades > 0 else 0
+        
+        # Prepare the response
+        response = {
+            'total_trades': len(entries),
+            'valid_trades': valid_trades,  # Include count of trades with valid PnL
+            'winning_trades': winning_trades,
+            'win_rate': win_rate,
+            'current_streak': {
+                'type': current_streak['type'],
+                'count': current_streak['count'],
+                'start_date': current_streak['start_date'],
+                'end_date': current_streak['end_date']
+            },
+            'longest_winning_streak': longest_winning,
+            'longest_losing_streak': longest_losing,
+            'winning_streaks': [{
+                'count': s['count'],
+                'start_date': s['start_date'],
+                'end_date': s['end_date'],
+                'pnl': s['pnl']
+            } for s in winning_streaks],
+            'losing_streaks': [{
+                'count': s['count'],
+                'start_date': s['start_date'],
+                'end_date': s['end_date'],
+                'pnl': s['pnl']
+            } for s in losing_streaks]
+        }
+        
+        return jsonify(response), 200
+        
+    except Exception as e:
+        print(f"Error in streak_analysis: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 # ─── Equity Analytics ────────────────────────────────────────────────────────
 @journal_bp.route('/equities', methods=['GET'])
