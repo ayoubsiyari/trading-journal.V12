@@ -1,7 +1,7 @@
 # app.py
 
 from flask import Flask, jsonify, request, make_response
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from models import db
 from config import Config
@@ -24,19 +24,15 @@ jwt = JWTManager(app)
 # DB setup
 db.init_app(app)
 
-# CORS setup - Configured to allow all origins
-app.config['CORS_HEADERS'] = 'Content-Type, Authorization, X-Requested-With'
-app.config['CORS_SUPPORTS_CREDENTIALS'] = True
-app.config['CORS_ORIGINS'] = '*'  # Allow all origins
-
-# Enable CORS for all routes
-cors = CORS(app, resources={
+# CORS setup - Simple configuration that should work with all routes
+cors = CORS()
+cors.init_app(app, resources={
     r"/*": {
         "origins": "*",
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True,
-        "expose_headers": ["Content-Type", "X-Total-Count", "Authorization"],
+        "expose_headers": ["Content-Type", "X-Total-Count"],
         "max_age": 600
     }
 })
@@ -47,17 +43,8 @@ app.register_blueprint(journal_bp, url_prefix='/api/journal')
 app.register_blueprint(profile_bp, url_prefix='/api/auth/profile')
 app.register_blueprint(admin_bp,   url_prefix='/api/admin')   # ← register admin
 
-@app.route('/', methods=['GET', 'OPTIONS'])
-@cross_origin(supports_credentials=True)
+@app.route('/', methods=['GET'])
 def home():
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', '*'))
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        response.headers.add('Access-Control-Max-Age', '600')
-        return response
     return {"status": "✅ Backend Running", "cors_configured": True, "environment": app.config.get('ENV', 'development')}
 
 # JWT error handlers
@@ -105,15 +92,12 @@ def log_request_info():
 
 # Add a catch-all route to handle OPTIONS for all paths
 @app.route('/<path:path>', methods=['OPTIONS'])
-@cross_origin(supports_credentials=True)
 def options_handler(path):
     response = make_response()
-    response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', '*'))
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    response.headers.add('Access-Control-Max-Age', '600')
-    response.headers.add('Access-Control-Expose-Headers', 'Content-Type, Authorization')
+    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
 
 if __name__ == '__main__':
