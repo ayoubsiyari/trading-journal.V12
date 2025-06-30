@@ -24,18 +24,16 @@ jwt = JWTManager(app)
 # DB setup
 db.init_app(app)
 
-# CORS setup - Simple configuration that should work with all routes
+# CORS setup - Very permissive configuration for development
+app.config['CORS_HEADERS'] = 'Content-Type, Authorization'
+app.config['CORS_ORIGINS'] = '*'
+app.config['CORS_METHODS'] = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH']
+app.config['CORS_ALLOW_HEADERS'] = ['Content-Type', 'Authorization', 'X-Requested-With']
+app.config['CORS_EXPOSE_HEADERS'] = ['Content-Type', 'X-Total-Count']
+app.config['CORS_SUPPORTS_CREDENTIALS'] = True
+
 cors = CORS()
-cors.init_app(app, resources={
-    r"/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True,
-        "expose_headers": ["Content-Type", "X-Total-Count"],
-        "max_age": 600
-    }
-})
+cors.init_app(app, resources={r"/*": {"origins": "*"}})
 
 # Register routes
 app.register_blueprint(auth_bp,    url_prefix='/api/auth')
@@ -94,10 +92,13 @@ def log_request_info():
 @app.route('/<path:path>', methods=['OPTIONS'])
 def options_handler(path):
     response = make_response()
-    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    origin = request.headers.get('Origin', '*')
+    response.headers['Access-Control-Allow-Origin'] = origin
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers['Access-Control-Max-Age'] = '600'
+    response.headers['Vary'] = 'Origin'
     return response
 
 if __name__ == '__main__':
